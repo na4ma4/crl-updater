@@ -1,0 +1,77 @@
+env:
+  - CGO_ENABLED=0
+
+before:
+  hooks:
+    - make test
+    - go generate ./...
+    - go mod tidy
+    - go mod download
+
+builds:
+  - id: crl-updater
+    main: ./cmd/crl-updater
+    binary: crl-updater
+    flags:
+      - -tags=release
+      - -buildmode=default
+      - -trimpath
+      - -v
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    goarm: ['5', '6', '7']
+    goos: ['linux', 'darwin', 'windows']
+    goarch: ['amd64', 'arm', 'arm64']
+    ignore:
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - allow_different_binary_count: true
+
+checksum:
+  algorithm: sha256
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+nfpms:
+  -
+    id: crl-updater
+    package_name: crl-updater
+    file_name_template: "crl-updater_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
+    builds:
+      - crl-updater
+    homepage: https://github.com/na4ma4/crl-updater
+    maintainer: na4ma4 <na4ma4@users.noreply.github.com>
+    description: CRL local file update
+    formats:
+      - apk
+      - deb
+    bindir: /usr/bin
+
+brews:
+  -
+    name: crl-updater
+    tap:
+      owner: na4ma4
+      name: homebrew-tap
+    commit_author:
+      name: goreleaserbot
+      email: na4ma4@users.noreply.github.com
+    folder: Formula
+    homepage: https://github.com/na4ma4/crl-updater
+    description: CRL local file update
+    test: |
+      system "#{bin}/crl-updater --version"
+    install: |
+      bin.install "crl-updater"
