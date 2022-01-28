@@ -36,7 +36,7 @@ func Parse(logger *zap.Logger, cfg *viper.Viper) []*Target {
 		}
 
 		for _, et := range eventTypes {
-			if v := cfg.GetString(fmt.Sprintf("%s.actions.%s", target, et)); v != "" {
+			if v := cfg.GetStringSlice(fmt.Sprintf("%s.actions.%s", target, et)); len(v) > 0 {
 				i.actions[et] = ActionFromString(v)
 				if i.workdir != "" {
 					i.actions[et].workdir = i.workdir

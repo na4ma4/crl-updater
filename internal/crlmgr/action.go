@@ -17,13 +17,13 @@ import (
 
 // Action encapsulates an action to be run at certain times.
 type Action struct {
-	cmd     string
+	cmd     []string
 	timeout time.Duration
 	workdir string
 }
 
 // ActionFromString returns a Action from the configuration string.
-func ActionFromString(in string) *Action {
+func ActionFromString(in []string) *Action {
 	return &Action{
 		cmd: in,
 	}
@@ -34,44 +34,44 @@ var ErrNonZero = errors.New("action command returned non-zero response")
 
 // Exec the syncronisation of a target from a source.
 func (a *Action) Exec(ctx context.Context) (string, error) {
-	args := a.splitCmd()
-
-	if a.timeout > 0 {
-		var cancel context.CancelFunc
-
-		ctx, cancel = context.WithTimeout(ctx, a.timeout)
-		defer cancel()
-	}
-
-	exitCode, ob, oberr, err := a.wrapCmd(ctx, args)
-	if err != nil {
-		return "", fmt.Errorf("action command failed to execute: %w", err)
-	}
-
 	sb := &strings.Builder{}
 
-	if _, err := io.Copy(sb, ob); err != nil {
-		return "", fmt.Errorf("unable to read stdout from action command: %w", err)
+	for _, cmd := range a.cmd {
+		args := a.splitCmd(cmd)
+
+		if a.timeout > 0 {
+			var cancel context.CancelFunc
+
+			ctx, cancel = context.WithTimeout(ctx, a.timeout)
+			defer cancel()
+		}
+
+		exitCode, ob, oberr, err := a.wrapCmd(ctx, args)
+		if err != nil {
+			return "", fmt.Errorf("action command failed to execute: %w", err)
+		}
+
+		if _, err := io.Copy(sb, ob); err != nil {
+			return "", fmt.Errorf("unable to read stdout from action command: %w", err)
+		}
+
+		if _, err := io.Copy(sb, oberr); err != nil {
+			return "", fmt.Errorf("unable to read stderr from action command: %w", err)
+		}
+
+		if exitCode != 0 {
+			return sb.String(), fmt.Errorf("%w: %d", ErrNonZero, exitCode)
+		}
 	}
 
-	if _, err := io.Copy(sb, oberr); err != nil {
-		return "", fmt.Errorf("unable to read stderr from action command: %w", err)
-	}
-
-	output := sb.String()
-
-	if exitCode != 0 {
-		return output, fmt.Errorf("%w: %d", ErrNonZero, exitCode)
-	}
-
-	return output, nil
+	return sb.String(), nil
 }
 
 // splitCmd uses `shellquote` on non windows platforms.
-func (a *Action) splitCmd() (o []string) {
-	o, err := shellquote.Split(a.cmd)
+func (a *Action) splitCmd(in string) (o []string) {
+	o, err := shellquote.Split(in)
 	if err != nil {
-		o = strings.Split(a.cmd, " ")
+		o = strings.Split(in, " ")
 	}
 
 	return
